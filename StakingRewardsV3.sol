@@ -51,7 +51,9 @@ interface PositionManagerV3 {
             uint128 tokensOwed1
         );
     function safeTransferFrom(address from, address to, uint tokenId) external;
+    
     function ownerOf(uint tokenId) external view returns (address);
+    function transferFrom(address from, address to, uint tokenId) external;
 }
 
 interface UniV3 {
@@ -135,7 +137,7 @@ contract StakingRewardsV3 {
         totalSupply += _liquidity;
         balanceOf[msg.sender] += _liquidity;
         
-        nftManager.safeTransferFrom(msg.sender, address(this), tokenId);
+        nftManager.transferFrom(msg.sender, address(this), tokenId);
         owners[tokenId] = msg.sender;
         
         if (!tokenExists[msg.sender][tokenId]) {

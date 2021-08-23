@@ -82,8 +82,8 @@ contract StakingRewardsV3 {
     
     uint unclaimed;
     
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
+    mapping(uint => uint) public userRewardPerTokenPaid;
+    mapping(uint => uint) public rewards;
     
     uint public totalSupply;
     mapping(address => uint) public balanceOf;
@@ -93,7 +93,7 @@ contract StakingRewardsV3 {
         uint128 secondsInside;
     }
     
-    mapping(address => time) public elapsed;
+    mapping(uint => time) public elapsed;
     mapping(uint => address) public owners;
     mapping(address => mapping(uint => bool)) public tokenExists;
     mapping(address => uint[]) public tokenIds;
@@ -114,8 +114,8 @@ contract StakingRewardsV3 {
         return rewardPerTokenStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * PRECISION / totalSupply);
     }
 
-    function earned(address account) public view returns (uint) {
-        return (balanceOf[account] * (rewardPerToken() - userRewardPerTokenPaid[account]) / PRECISION);
+    function earned(uint tokenId) public view returns (uint) {
+        return (_getLiquidity(tokenId) * (rewardPerToken() - userRewardPerTokenPaid[tokenId]) / PRECISION);
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -130,7 +130,7 @@ contract StakingRewardsV3 {
         require(pool == _pool);
         require(_liquidity > 0);
         
-        elapsed[msg.sender] = time(uint128(block.timestamp), _secondsInside);
+        elapsed[tokenId] = time(uint128(block.timestamp), _secondsInside);
         
         totalSupply += _liquidity;
         balanceOf[msg.sender] += _liquidity;
@@ -158,17 +158,23 @@ contract StakingRewardsV3 {
     function getRewards() external {
         uint[] memory _tokens = tokenIds[msg.sender];
         for (uint i = 0; i < _tokens.length; i++) {
-            if (nftManager.ownerOf(_tokens[i]) == address(this)) {
-                getReward(_tokens[i]);
-            }
+            getReward(_tokens[i]);
         }
     }
 
     function getReward(uint tokenId) public update(tokenId) {
-        uint _reward = rewards[msg.sender];
+        uint _reward = rewards[tokenId];
         if (_reward > 0) {
-            rewards[msg.sender] = 0;
-            _safeTransfer(reward, msg.sender, _reward);
+            rewards[tokenId] = 0;
+            _safeTransfer(reward, _getRecipient(tokenId), _reward);
+        }
+    }
+    
+    function _getRecipient(uint tokenId) internal view returns (address) {
+        if (owners[tokenId] != address(0)) {
+            return owners[tokenId];
+        } else {
+            return nftManager.ownerOf(tokenId);
         }
     }
     
@@ -176,8 +182,9 @@ contract StakingRewardsV3 {
         uint[] memory _tokens = tokenIds[msg.sender];
         for (uint i = 0; i < _tokens.length; i++) {
             if (nftManager.ownerOf(_tokens[i]) == address(this)) {
-                exit(_tokens[i]);
+                withdraw(_tokens[i]);
             }
+            getReward(_tokens[i]);
         }
     }
 
@@ -207,17 +214,17 @@ contract StakingRewardsV3 {
         lastUpdateTime = lastTimeRewardApplicable();
         address account = owners[tokenId];
         if (account != address(0)) {
-            uint _reward = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+            uint _reward = earned(tokenId);
+            userRewardPerTokenPaid[tokenId] = rewardPerTokenStored;
             
-            time memory _elapsed = elapsed[account];
+            time memory _elapsed = elapsed[tokenId];
             uint32 secondsInside = _getSecondsInside(tokenId);
             
             uint _earned = _reward * (secondsInside - _elapsed.secondsInside) / (block.timestamp - _elapsed.timestamp);
-            rewards[account] += _earned;
+            rewards[tokenId] += _earned;
             unclaimed += (_reward - _earned);
             
-            elapsed[msg.sender] = time(uint128(block.timestamp), secondsInside);
+            elapsed[tokenId] = time(uint128(block.timestamp), secondsInside);
         }
         _;
     }

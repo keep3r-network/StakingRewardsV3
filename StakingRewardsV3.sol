@@ -151,8 +151,9 @@ contract StakingRewardsV3 {
         totalSupply -= _liquidity;
         balanceOf[msg.sender] -= _liquidity;
         
-        nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
         owners[tokenId] = address(0);
+        nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
+        
     }
     
     function getRewards() external {

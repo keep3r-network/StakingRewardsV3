@@ -89,6 +89,7 @@ contract StakingRewardsV3 {
     
     uint public totalSupply;
     mapping(address => uint) public balanceOf;
+    mapping(uint => uint) public liquidityOf;
     
     struct time {
         uint128 timestamp;
@@ -116,8 +117,14 @@ contract StakingRewardsV3 {
         return rewardPerTokenStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * PRECISION / totalSupply);
     }
 
-    function earned(uint tokenId) public view returns (uint) {
-        return (_getLiquidity(tokenId) * (rewardPerToken() - userRewardPerTokenPaid[tokenId]) / PRECISION);
+    function earned(uint tokenId) public view returns (uint claimable, uint notInRange, uint32 secondsInside) {
+        uint _reward = (liquidityOf[tokenId] * (rewardPerToken() - userRewardPerTokenPaid[tokenId]) / PRECISION);
+            
+        time memory _elapsed = elapsed[tokenId];
+        secondsInside = _getSecondsInside(tokenId);
+        
+        claimable = (_reward * (secondsInside - _elapsed.secondsInside) / (block.timestamp - _elapsed.timestamp)) + rewards[tokenId];
+        notInRange = (_reward - claimable);
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -136,6 +143,7 @@ contract StakingRewardsV3 {
         
         totalSupply += _liquidity;
         balanceOf[msg.sender] += _liquidity;
+        liquidityOf[tokenId] = _liquidity;
         
         nftManager.transferFrom(msg.sender, address(this), tokenId);
         owners[tokenId] = msg.sender;
@@ -148,7 +156,7 @@ contract StakingRewardsV3 {
 
     function withdraw(uint tokenId) public update(tokenId) {
         require(owners[tokenId] == msg.sender);
-        uint128 _liquidity = _getLiquidity(tokenId);
+        uint _liquidity = liquidityOf[tokenId];
         
         totalSupply -= _liquidity;
         balanceOf[msg.sender] -= _liquidity;
@@ -217,23 +225,15 @@ contract StakingRewardsV3 {
         lastUpdateTime = lastTimeRewardApplicable();
         address account = owners[tokenId];
         if (account != address(0)) {
-            uint _reward = earned(tokenId);
+            (uint _reward, uint _notInRange, uint32 _secondsInside) = earned(tokenId);
             userRewardPerTokenPaid[tokenId] = rewardPerTokenStored;
             
-            time memory _elapsed = elapsed[tokenId];
-            uint32 secondsInside = _getSecondsInside(tokenId);
+            rewards[tokenId] = _reward;
+            unclaimed += _notInRange;
             
-            uint _earned = _reward * (secondsInside - _elapsed.secondsInside) / (block.timestamp - _elapsed.timestamp);
-            rewards[tokenId] += _earned;
-            unclaimed += (_reward - _earned);
-            
-            elapsed[tokenId] = time(uint128(block.timestamp), secondsInside);
+            elapsed[tokenId] = time(uint128(block.timestamp), _secondsInside);
         }
         _;
-    }
-    
-    function _getLiquidity(uint tokenId) internal view returns (uint128 liquidity) {
-        (,,,,,,,liquidity,,,,) = nftManager.positions(tokenId);
     }
     
     function _getSecondsInside(uint256 tokenId) internal view returns (uint32 secondsInside) {

@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.6;
 
+library Math {
+    function max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a >= b ? a : b;
+    }
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+}
+
+
 library PoolAddress {
     bytes32 internal constant POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
     
@@ -80,20 +90,16 @@ contract StakingRewardsV3 {
     uint rewardRate;
     uint periodFinish;
     uint lastUpdateTime;
-    uint rewardPerTokenStored;
+    uint rewardPerSecondStored;
     
     uint unclaimed;
     
-    mapping(uint => uint) public userRewardPerTokenPaid;
+    mapping(uint => uint) public tokenRewardPerSecondPaid;
     mapping(uint => uint) public rewards;
     
-    uint public totalSupply;
-    mapping(address => uint) public balanceOf;
-    mapping(uint => uint) public liquidityOf;
-    
     struct time {
-        uint128 timestamp;
-        uint128 secondsInside;
+        uint32 timestamp;
+        uint160 secondsPerLiquidityInside;
     }
     
     mapping(uint => time) public elapsed;
@@ -105,26 +111,25 @@ contract StakingRewardsV3 {
         reward = _reward;
         pool = _pool;
     }
-
+    
     function lastTimeRewardApplicable() public view returns (uint) {
-        return block.timestamp < periodFinish ? block.timestamp : periodFinish;
+        return Math.min(block.timestamp, periodFinish);
     }
 
-    function rewardPerToken() public view returns (uint) {
-        if (totalSupply == 0) {
-            return rewardPerTokenStored;
-        }
-        return rewardPerTokenStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * PRECISION / totalSupply);
+    function rewardPerSecond() public view returns (uint) {
+        return rewardPerSecondStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate);
     }
 
-    function earned(uint tokenId) public view returns (uint claimable, uint notInRange, uint32 secondsInside) {
-        uint _reward = (liquidityOf[tokenId] * (rewardPerToken() - userRewardPerTokenPaid[tokenId]) / PRECISION);
+    function earned(uint tokenId) public view returns (uint claimable, uint notInRange, uint160 secondsPerLiquidityInside) {
+        uint _reward = rewardPerSecond() - tokenRewardPerSecondPaid[tokenId];
             
         time memory _elapsed = elapsed[tokenId];
-        secondsInside = _getSecondsInside(tokenId);
+        secondsPerLiquidityInside = _getSecondsInside(tokenId);
+        uint160 secondsInside = (secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId);
+        uint32 _fullDuration = uint32(Math.min(periodFinish, block.timestamp)) - _elapsed.timestamp; 
         
-        claimable = (_reward * (secondsInside - _elapsed.secondsInside) / (block.timestamp - _elapsed.timestamp)) + rewards[tokenId];
-        notInRange = (_reward - claimable);
+        claimable = secondsInside * _reward;
+        notInRange = (_reward * _fullDuration) - claimable;
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -139,11 +144,7 @@ contract StakingRewardsV3 {
         require(pool == _pool);
         require(_liquidity > 0);
         
-        elapsed[tokenId] = time(uint128(block.timestamp), _secondsInside);
-        
-        totalSupply += _liquidity;
-        balanceOf[msg.sender] += _liquidity;
-        liquidityOf[tokenId] = _liquidity;
+        elapsed[tokenId] = time(uint32(block.timestamp), _secondsInside);
         
         nftManager.transferFrom(msg.sender, address(this), tokenId);
         owners[tokenId] = msg.sender;
@@ -156,14 +157,8 @@ contract StakingRewardsV3 {
 
     function withdraw(uint tokenId) public update(tokenId) {
         require(owners[tokenId] == msg.sender);
-        uint _liquidity = liquidityOf[tokenId];
-        
-        totalSupply -= _liquidity;
-        balanceOf[msg.sender] -= _liquidity;
-        
         owners[tokenId] = address(0);
         nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
-        
     }
     
     function getRewards() external {
@@ -221,24 +216,27 @@ contract StakingRewardsV3 {
     }
 
     modifier update(uint tokenId) {
-        rewardPerTokenStored = rewardPerToken();
+        rewardPerSecondStored = rewardPerSecond();
         lastUpdateTime = lastTimeRewardApplicable();
-        address account = owners[tokenId];
-        if (account != address(0)) {
-            (uint _reward, uint _notInRange, uint32 _secondsInside) = earned(tokenId);
-            userRewardPerTokenPaid[tokenId] = rewardPerTokenStored;
+        if (tokenId != 0) {
+            (uint _reward, uint _notInRange, uint160 _secondsInside) = earned(tokenId);
+            tokenRewardPerSecondPaid[tokenId] = rewardPerSecondStored;
             
             rewards[tokenId] = _reward;
             unclaimed += _notInRange;
             
-            elapsed[tokenId] = time(uint128(block.timestamp), _secondsInside);
+            elapsed[tokenId] = time(uint32(Math.min(block.timestamp, periodFinish)), _secondsInside);
         }
         _;
     }
     
-    function _getSecondsInside(uint256 tokenId) internal view returns (uint32 secondsInside) {
+    function _getLiquidity(uint tokenId) internal view returns (uint128 liquidity) {
+        (,,,,,,,liquidity,,,,) = nftManager.positions(tokenId);
+    }
+    
+    function _getSecondsInside(uint256 tokenId) internal view returns (uint160 secondsPerLiquidityInside) {
         (,,,,,int24 tickLower,int24 tickUpper,,,,,) = nftManager.positions(tokenId);
-        (,,secondsInside) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
+        (,secondsPerLiquidityInside,) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
     }
     
     function _safeTransfer(address token, address to, uint256 value) internal {

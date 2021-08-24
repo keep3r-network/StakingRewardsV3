@@ -103,6 +103,7 @@ contract StakingRewardsV3 {
     mapping(uint => address) public owners;
     mapping(address => mapping(uint => bool)) public tokenExists;
     mapping(address => uint[]) public tokenIds;
+    mapping(uint => uint) public liquidityOf;
     
     constructor(address _reward, address _pool) {
         reward = _reward;
@@ -122,7 +123,7 @@ contract StakingRewardsV3 {
             
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
-        uint _liquidity = _getLiquidity(tokenId);
+        uint _liquidity = liquidityOf[tokenId];
         uint _maxSecondsPerLiquidityInside = (lastUpdateTime - _elapsed.timestamp) * _liquidity / UniV3(pool).liquidity();
         uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _liquidity, _maxSecondsPerLiquidityInside);
         claimable = (_reward * _secondsInside) + rewards[tokenId];
@@ -140,6 +141,8 @@ contract StakingRewardsV3 {
         require(pool == _pool);
         require(_liquidity > 0);
         
+        liquidityOf[tokenId] = _liquidity;
+        
         elapsed[tokenId] = time(uint32(lastTimeRewardApplicable()), _secondsPerLiquidityInside);
         
         nftManager.transferFrom(msg.sender, address(this), tokenId);
@@ -153,6 +156,7 @@ contract StakingRewardsV3 {
 
     function withdraw(uint tokenId) public update(tokenId) {
         require(owners[tokenId] == msg.sender);
+        liquidityOf[tokenId] = 0;
         owners[tokenId] = address(0);
         nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
     }
@@ -222,10 +226,6 @@ contract StakingRewardsV3 {
             }
         }
         _;
-    }
-    
-    function _getLiquidity(uint tokenId) internal view returns (uint128 liquidity) {
-        (,,,,,,,liquidity,,,,) = nftManager.positions(tokenId);
     }
     
     function _getSecondsInside(uint256 tokenId) internal view returns (uint160 secondsPerLiquidityInside) {

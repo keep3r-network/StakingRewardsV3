@@ -125,10 +125,10 @@ contract StakingRewardsV3 {
             
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
-        uint160 secondsInside = (secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId);
-        uint32 _fullDuration = uint32(Math.min(periodFinish, block.timestamp)) - _elapsed.timestamp; 
+        uint secondsInside = (secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId);
+        uint _fullDuration = Math.min(periodFinish, block.timestamp) - _elapsed.timestamp; 
         
-        claimable = secondsInside * _reward;
+        claimable = (secondsInside * _reward) + rewards[tokenId];
         notInRange = (_reward * _fullDuration) - claimable;
     }
 

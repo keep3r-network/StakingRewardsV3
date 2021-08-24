@@ -123,7 +123,7 @@ contract StakingRewardsV3 {
             
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
-        uint _fullDuration = lastTimeRewardApplicable() - _elapsed.timestamp;
+        uint _fullDuration = lastUpdateTime - _elapsed.timestamp;
         uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId), _fullDuration);
         claimable = (_reward * _secondsInside);
         notInRange = (_reward * _fullDuration) - claimable;

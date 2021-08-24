@@ -89,6 +89,7 @@ contract StakingRewardsV3 {
     uint periodFinish;
     uint lastUpdateTime;
     uint rewardPerSecondStored;
+    uint totalSecondsClaimed;
     
     uint unclaimed;
     
@@ -118,15 +119,14 @@ contract StakingRewardsV3 {
         return rewardPerSecondStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate);
     }
 
-    function earned(uint tokenId) public view returns (uint claimable, uint notInRange, uint160 secondsPerLiquidityInside) {
+    function earned(uint tokenId) public view returns (uint claimable, uint160 secondsPerLiquidityInside, uint secondsInside) {
         uint _reward = rewardPerSecond() - tokenRewardPerSecondPaid[tokenId];
             
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
         uint _fullDuration = lastUpdateTime - _elapsed.timestamp;
-        uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId), _fullDuration);
-        claimable = (_reward * _secondsInside);
-        notInRange = (_reward * _fullDuration) - claimable;
+        secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId), _fullDuration);
+        claimable = (_reward * secondsInside) + rewards[tokenId];
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -198,7 +198,7 @@ contract StakingRewardsV3 {
     
     function notify(uint amount) external update(0) {
         _safeTransferFrom(reward, msg.sender, address(this), amount);
-        amount += unclaimed;
+        amount += rewardRate * (DURATION - totalSecondsClaimed);
         unclaimed = 0;
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
@@ -216,11 +216,10 @@ contract StakingRewardsV3 {
         rewardPerSecondStored = rewardPerSecond();
         lastUpdateTime = lastTimeRewardApplicable();
         if (tokenId != 0) {
-            (uint _reward, uint _notInRange, uint160 _secondsPerLiquidityInside) = earned(tokenId);
+            (uint _reward, uint160 _secondsPerLiquidityInside, uint _secondsInside) = earned(tokenId);
             tokenRewardPerSecondPaid[tokenId] = rewardPerSecondStored;
-            
-            rewards[tokenId] += _reward;
-            unclaimed += _notInRange;
+            rewards[tokenId] = _reward;
+            totalSecondsClaimed += _secondsInside;
             
             if (elapsed[tokenId].timestamp < lastUpdateTime) {
                 elapsed[tokenId] = time(uint32(lastUpdateTime), _secondsPerLiquidityInside);

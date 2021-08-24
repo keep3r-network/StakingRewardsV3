@@ -92,8 +92,6 @@ contract StakingRewardsV3 {
     uint rewardPerSecondStored;
     uint totalSecondsClaimed;
     
-    uint unclaimed;
-    
     mapping(uint => uint) public tokenRewardPerSecondPaid;
     mapping(uint => uint) public rewards;
     
@@ -201,7 +199,7 @@ contract StakingRewardsV3 {
     function notify(uint amount) external update(0) {
         _safeTransferFrom(reward, msg.sender, address(this), amount);
         amount += rewardRate * (DURATION - totalSecondsClaimed);
-        unclaimed = 0;
+        totalSecondsClaimed = 0;
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {

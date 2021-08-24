@@ -80,11 +80,10 @@ contract StakingRewardsV3 {
     
     address immutable public reward;
     address immutable public pool;
+    
     address constant factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     PositionManagerV3 constant nftManager = PositionManagerV3(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
-    
     uint constant DURATION = 7 days;
-    uint constant PRECISION = 10 ** 18;
     
     uint rewardRate;
     uint periodFinish;

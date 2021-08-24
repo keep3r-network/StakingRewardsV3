@@ -124,9 +124,8 @@ contract StakingRewardsV3 {
         time memory _elapsed = elapsed[tokenId];
         uint secondsInside;
         (secondsPerLiquidityInside, secondsInside) = _getSecondsInside(tokenId);
-        uint _liquidity = liquidityOf[tokenId];
         uint _maxSecondsInside = lastUpdateTime - _elapsed.timestamp;
-        uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _liquidity, _maxSecondsInside);
+        uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * liquidityOf[tokenId], _maxSecondsInside);
         if (secondsInside > _maxSecondsInside && _secondsInside > 0) {
             _secondsInside = _secondsInside * _maxSecondsInside / secondsInside;
         }

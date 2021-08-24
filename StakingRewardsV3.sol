@@ -124,10 +124,9 @@ contract StakingRewardsV3 {
             
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
-        uint secondsInside = (secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId);
-        uint _fullDuration = Math.min(periodFinish, block.timestamp) - _elapsed.timestamp; 
-        
-        claimable = (secondsInside * _reward) + rewards[tokenId];
+        uint _fullDuration = lastTimeRewardApplicable() - _elapsed.timestamp;
+        uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId), _fullDuration);
+        claimable = (_secondsInside * _reward) + rewards[tokenId];
         notInRange = (_reward * _fullDuration) - claimable;
     }
 
@@ -138,12 +137,12 @@ contract StakingRewardsV3 {
     function deposit(uint tokenId) external update(tokenId) {
         (,,address token0, address token1,uint24 fee,int24 tickLower,int24 tickUpper,uint128 _liquidity,,,,) = nftManager.positions(tokenId);
         address _pool = PoolAddress.computeAddress(factory,PoolAddress.PoolKey({token0: token0, token1: token1, fee: fee}));
-        (,,uint32 _secondsInside) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
+        (,uint160 _secondsPerLiquidityInside,) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
 
         require(pool == _pool);
         require(_liquidity > 0);
         
-        elapsed[tokenId] = time(uint32(block.timestamp), _secondsInside);
+        elapsed[tokenId] = time(uint32(lastTimeRewardApplicable()), _secondsPerLiquidityInside);
         
         nftManager.transferFrom(msg.sender, address(this), tokenId);
         owners[tokenId] = msg.sender;
@@ -218,13 +217,13 @@ contract StakingRewardsV3 {
         rewardPerSecondStored = rewardPerSecond();
         lastUpdateTime = lastTimeRewardApplicable();
         if (tokenId != 0) {
-            (uint _reward, uint _notInRange, uint160 _secondsInside) = earned(tokenId);
+            (uint _reward, uint _notInRange, uint160 _secondsPerLiquidityInside) = earned(tokenId);
             tokenRewardPerSecondPaid[tokenId] = rewardPerSecondStored;
             
             rewards[tokenId] = _reward;
             unclaimed += _notInRange;
             
-            elapsed[tokenId] = time(uint32(Math.min(block.timestamp, periodFinish)), _secondsInside);
+            elapsed[tokenId] = time(uint32(lastTimeRewardApplicable()), _secondsPerLiquidityInside);
         }
         _;
     }

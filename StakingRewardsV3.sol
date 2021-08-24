@@ -124,8 +124,8 @@ contract StakingRewardsV3 {
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
         uint _liquidity = liquidityOf[tokenId];
-        uint _maxSecondsPerLiquidityInside = (lastUpdateTime - _elapsed.timestamp) * _liquidity / UniV3(pool).liquidity();
-        uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _liquidity, _maxSecondsPerLiquidityInside);
+        uint _maxSecondsInside = lastUpdateTime - _elapsed.timestamp;
+        uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _liquidity, _maxSecondsInside);
         claimable = (_reward * _secondsInside) + rewards[tokenId];
     }
 

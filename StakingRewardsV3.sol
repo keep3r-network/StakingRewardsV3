@@ -74,6 +74,7 @@ interface UniV3 {
             uint160 secondsPerLiquidityInsideX128,
             uint32 secondsInside
         );
+    function liquidity() external view returns (uint128);
 }
 
 contract StakingRewardsV3 {
@@ -124,8 +125,9 @@ contract StakingRewardsV3 {
             
         time memory _elapsed = elapsed[tokenId];
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
-        uint _fullDuration = lastUpdateTime - _elapsed.timestamp;
-        secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId), _fullDuration);
+        uint _liquidity = _getLiquidity(tokenId);
+        uint _maxSecondsPerLiquidityInside = (lastUpdateTime - _elapsed.timestamp) * _liquidity / UniV3(pool).liquidity();
+        secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _liquidity, _maxSecondsPerLiquidityInside);
         claimable = (_reward * secondsInside) + rewards[tokenId];
     }
 

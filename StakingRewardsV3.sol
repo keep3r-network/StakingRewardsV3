@@ -122,10 +122,14 @@ contract StakingRewardsV3 {
         uint _reward = rewardPerSecond() - tokenRewardPerSecondPaid[tokenId];
             
         time memory _elapsed = elapsed[tokenId];
-        secondsPerLiquidityInside = _getSecondsInside(tokenId);
+        uint secondsInside;
+        (secondsPerLiquidityInside, secondsInside) = _getSecondsInside(tokenId);
         uint _liquidity = liquidityOf[tokenId];
         uint _maxSecondsInside = lastUpdateTime - _elapsed.timestamp;
         uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _liquidity, _maxSecondsInside);
+        if (secondsInside > _maxSecondsInside && _secondsInside > 0) {
+            _secondsInside = _secondsInside * _maxSecondsInside / secondsInside;
+        }
         claimable = (_reward * _secondsInside) + rewards[tokenId];
     }
 
@@ -228,9 +232,9 @@ contract StakingRewardsV3 {
         _;
     }
     
-    function _getSecondsInside(uint256 tokenId) internal view returns (uint160 secondsPerLiquidityInside) {
+    function _getSecondsInside(uint256 tokenId) internal view returns (uint160 secondsPerLiquidityInside, uint secondsInside) {
         (,,,,,int24 tickLower,int24 tickUpper,,,,,) = nftManager.positions(tokenId);
-        (,secondsPerLiquidityInside,) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
+        (,secondsPerLiquidityInside,secondsInside) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
     }
     
     function _safeTransfer(address token, address to, uint256 value) internal {

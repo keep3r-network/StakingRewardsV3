@@ -126,7 +126,7 @@ contract StakingRewardsV3 {
         secondsPerLiquidityInside = _getSecondsInside(tokenId);
         uint _fullDuration = lastTimeRewardApplicable() - _elapsed.timestamp;
         uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * _getLiquidity(tokenId), _fullDuration);
-        claimable = (_secondsInside * _reward) + rewards[tokenId];
+        claimable = (_secondsInside * _reward);
         notInRange = (_reward * _fullDuration) - claimable;
     }
 
@@ -220,7 +220,7 @@ contract StakingRewardsV3 {
             (uint _reward, uint _notInRange, uint160 _secondsPerLiquidityInside) = earned(tokenId);
             tokenRewardPerSecondPaid[tokenId] = rewardPerSecondStored;
             
-            rewards[tokenId] = _reward;
+            rewards[tokenId] += _reward;
             unclaimed += _notInRange;
             
             elapsed[tokenId] = time(uint32(lastTimeRewardApplicable()), _secondsPerLiquidityInside);

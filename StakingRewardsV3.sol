@@ -179,7 +179,6 @@ contract StakingRewardsV3 {
         for (uint i = index; i < array.length-1; i++){
             array[i] = array[i+1];
         }
-        delete array[array.length-1];
         array.pop();
     }
 

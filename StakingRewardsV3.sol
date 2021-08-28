@@ -101,13 +101,21 @@ contract StakingRewardsV3 {
     
     mapping(uint => time) public elapsed;
     mapping(uint => address) public owners;
-    mapping(address => mapping(uint => bool)) public tokenExists;
     mapping(address => uint[]) public tokenIds;
     mapping(uint => uint) public liquidityOf;
+    
+    event RewardPaid(address indexed sender, uint tokenId, uint reward);
+    event RewardAdded(address indexed sender, uint reward);
+    event Deposit(address indexed sender, uint tokenId, uint liquidity);
+    event Withdraw(address indexed sender, uint tokenId, uint liquidity);
     
     constructor(address _reward, address _pool) {
         reward = _reward;
         pool = _pool;
+    }
+    
+    function getTokenIds(address owner) external view returns (uint[] memory) {
+        return tokenIds[owner];
     }
     
     function lastTimeRewardApplicable() public view returns (uint) {
@@ -148,20 +156,41 @@ contract StakingRewardsV3 {
         
         elapsed[tokenId] = time(uint32(lastTimeRewardApplicable()), _secondsPerLiquidityInside);
         
-        nftManager.transferFrom(msg.sender, address(this), tokenId);
         owners[tokenId] = msg.sender;
+        tokenIds[msg.sender].push(tokenId);
         
-        if (!tokenExists[msg.sender][tokenId]) {
-            tokenExists[msg.sender][tokenId] = true;
-            tokenIds[msg.sender].push(tokenId);
+        nftManager.transferFrom(msg.sender, address(this), tokenId);
+        
+        emit Deposit(msg.sender, tokenId, _liquidity);
+    }
+    
+    function _findIndex(uint[] memory array, uint element) internal pure returns (uint i) {
+        for (i = 0; i < array.length; i++) {
+            if (array[i] == element) {
+                break;
+            }
         }
+    }
+    
+    function _remove(uint[] storage array, uint element) internal {
+        uint index = _findIndex(array, element);
+        if (index >= array.length) return;
+
+        for (uint i = index; i < array.length-1; i++){
+            array[i] = array[i+1];
+        }
+        delete array[array.length-1];
     }
 
     function withdraw(uint tokenId) public update(tokenId) {
         require(owners[tokenId] == msg.sender);
+        uint _liquidity = liquidityOf[tokenId];
         liquidityOf[tokenId] = 0;
         owners[tokenId] = address(0);
+        _remove(tokenIds[msg.sender], tokenId);
         nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
+        
+        emit Deposit(msg.sender, tokenId, _liquidity);
     }
     
     function getRewards() external {
@@ -176,6 +205,8 @@ contract StakingRewardsV3 {
         if (_reward > 0) {
             rewards[tokenId] = 0;
             _safeTransfer(reward, _getRecipient(tokenId), _reward);
+            
+            emit RewardPaid(msg.sender, tokenId, _reward);
         }
     }
     
@@ -214,6 +245,8 @@ contract StakingRewardsV3 {
         
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp + DURATION;
+        
+        emit RewardAdded(msg.sender, amount);
     }
 
     modifier update(uint tokenId) {

@@ -180,6 +180,7 @@ contract StakingRewardsV3 {
             array[i] = array[i+1];
         }
         delete array[array.length-1];
+        array.pop();
     }
 
     function withdraw(uint tokenId) public update(tokenId) {

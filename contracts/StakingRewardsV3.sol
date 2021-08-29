@@ -222,9 +222,7 @@ contract StakingRewardsV3 {
     function exit() external {
         uint[] memory _tokens = tokenIds[msg.sender];
         for (uint i = 0; i < _tokens.length; i++) {
-            if (nftManager.ownerOf(_tokens[i]) == address(this)) {
-                withdraw(_tokens[i]);
-            }
+            withdraw(_tokens[i]);
             getReward(_tokens[i]);
         }
     }
@@ -253,7 +251,7 @@ contract StakingRewardsV3 {
     modifier update(uint tokenId) {
         rewardPerSecondStored = rewardPerSecond();
         lastUpdateTime = lastTimeRewardApplicable();
-        if (tokenId != 0) {
+        if (tokenId != 0 && liquidityOf[tokenId] > 0) {
             (uint _reward, uint160 _secondsPerLiquidityInside) = earned(tokenId);
             tokenRewardPerSecondPaid[tokenId] = rewardPerSecondStored;
             rewards[tokenId] = _reward;

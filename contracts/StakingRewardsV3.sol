@@ -145,16 +145,13 @@ contract StakingRewardsV3 {
     }
 
     function deposit(uint tokenId) external update(tokenId) {
-        (,,address token0, address token1,uint24 fee,int24 tickLower,int24 tickUpper,uint128 _liquidity,,,,) = nftManager.positions(tokenId);
+        (,,address token0, address token1,uint24 fee,,,uint128 _liquidity,,,,) = nftManager.positions(tokenId);
         address _pool = PoolAddress.computeAddress(factory,PoolAddress.PoolKey({token0: token0, token1: token1, fee: fee}));
-        (,uint160 _secondsPerLiquidityInside,) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
 
         require(pool == _pool);
         require(_liquidity > 0);
 
         liquidityOf[tokenId] = _liquidity;
-
-        elapsed[tokenId] = time(uint32(lastTimeRewardApplicable()), _secondsPerLiquidityInside);
 
         owners[tokenId] = msg.sender;
         tokenIds[msg.sender].push(tokenId);
@@ -249,15 +246,17 @@ contract StakingRewardsV3 {
     }
 
     modifier update(uint tokenId) {
-        rewardPerSecondStored = rewardPerSecond();
-        lastUpdateTime = lastTimeRewardApplicable();
-        if (tokenId != 0 && liquidityOf[tokenId] > 0) {
+        uint _rewardPerSecondStored = rewardPerSecond();
+        uint _lastUpdateTime = lastTimeRewardApplicable();
+        rewardPerSecondStored = _rewardPerSecondStored;
+        lastUpdateTime = _lastUpdateTime;
+        if (tokenId != 0) {
             (uint _reward, uint160 _secondsPerLiquidityInside) = earned(tokenId);
-            tokenRewardPerSecondPaid[tokenId] = rewardPerSecondStored;
+            tokenRewardPerSecondPaid[tokenId] = _rewardPerSecondStored;
             rewards[tokenId] = _reward;
 
-            if (elapsed[tokenId].timestamp < lastUpdateTime) {
-                elapsed[tokenId] = time(uint32(lastUpdateTime), _secondsPerLiquidityInside);
+            if (elapsed[tokenId].timestamp < _lastUpdateTime) {
+                elapsed[tokenId] = time(uint32(_lastUpdateTime), _secondsPerLiquidityInside);
             }
         }
         _;

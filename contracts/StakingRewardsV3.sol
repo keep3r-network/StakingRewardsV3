@@ -107,6 +107,7 @@ contract StakingRewardsV3 {
     mapping(address => uint[]) public tokenIds;
     mapping(uint => uint) public liquidityOf;
     uint public totalLiquidity;
+    uint public unused;
 
     event RewardPaid(address indexed sender, uint tokenId, uint reward);
     event RewardAdded(address indexed sender, uint reward);
@@ -234,6 +235,13 @@ contract StakingRewardsV3 {
         }
     }
 
+    function withdraw() external {
+        uint[] memory _tokens = tokenIds[msg.sender];
+        for (uint i = 0; i < _tokens.length; i++) {
+            withdraw(_tokens[i]);
+        }
+    }
+
     function exit(uint tokenId) public {
         withdraw(tokenId);
         getReward(tokenId);
@@ -243,13 +251,18 @@ contract StakingRewardsV3 {
         _withdraw(tokenId);
     }
 
+    function _unused() internal  {
+        uint _maxLiquidity = UniV3(pool).liquidity();
+        unused += (rewardRate * (DURATION-(Math.max(periodFinish, block.timestamp) - block.timestamp))) * (_maxLiquidity-totalLiquidity) / _maxLiquidity;
+    }
+
+    function refund() external {
+        _unused();
+        if (unused > 0) { _safeTransfer(reward, owner, Math.min(unused, erc20(reward).balanceOf(address(this)))); }
+    }
+
     function notify(uint amount) external update(0) {
         require(msg.sender == owner);
-
-        uint _maxLiquidity = UniV3(pool).liquidity();
-        uint _unused = (rewardRate * (DURATION-(Math.max(periodFinish, block.timestamp) - block.timestamp))) * (_maxLiquidity-totalLiquidity) / _maxLiquidity;
-        if (_unused > 0) { _safeTransfer(reward, owner, Math.min(_unused, erc20(reward).balanceOf(address(this)))); }
-
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {
@@ -267,6 +280,7 @@ contract StakingRewardsV3 {
     }
 
     modifier update(uint tokenId) {
+        _unused();
         uint _rewardPerSecondStored = rewardPerSecond();
         uint _lastUpdateTime = lastTimeRewardApplicable();
         rewardPerSecondStored = _rewardPerSecondStored;

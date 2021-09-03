@@ -39,6 +39,7 @@ library PoolAddress {
 interface erc20 {
     function transfer(address recipient, uint amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint amount) external returns (bool);
+    function balanceOf(address) external view returns (uint);
 }
 
 interface PositionManagerV3 {
@@ -94,6 +95,8 @@ contract StakingRewardsV3 {
     mapping(uint => uint) public tokenRewardPerSecondPaid;
     mapping(uint => uint) public rewards;
 
+    address immutable owner;
+
     struct time {
         uint32 timestamp;
         uint160 secondsPerLiquidityInside;
@@ -103,6 +106,7 @@ contract StakingRewardsV3 {
     mapping(uint => address) public owners;
     mapping(address => uint[]) public tokenIds;
     mapping(uint => uint) public liquidityOf;
+    uint public totalLiquidity;
 
     event RewardPaid(address indexed sender, uint tokenId, uint reward);
     event RewardAdded(address indexed sender, uint reward);
@@ -112,10 +116,11 @@ contract StakingRewardsV3 {
     constructor(address _reward, address _pool) {
         reward = _reward;
         pool = _pool;
+        owner = msg.sender;
     }
 
-    function getTokenIds(address owner) external view returns (uint[] memory) {
-        return tokenIds[owner];
+    function getTokenIds(address _owner) external view returns (uint[] memory) {
+        return tokenIds[_owner];
     }
 
     function lastTimeRewardApplicable() public view returns (uint) {
@@ -152,6 +157,7 @@ contract StakingRewardsV3 {
         require(_liquidity > 0);
 
         liquidityOf[tokenId] = _liquidity;
+        totalLiquidity += _liquidity;
         owners[tokenId] = msg.sender;
         tokenIds[msg.sender].push(tokenId);
 
@@ -187,6 +193,7 @@ contract StakingRewardsV3 {
         require(owners[tokenId] == msg.sender);
         uint _liquidity = liquidityOf[tokenId];
         liquidityOf[tokenId] = 0;
+        totalLiquidity -= _liquidity;
         owners[tokenId] = address(0);
         _remove(tokenIds[msg.sender], tokenId);
         nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
@@ -237,18 +244,25 @@ contract StakingRewardsV3 {
     }
 
     function notify(uint amount) external update(0) {
-        _safeTransferFrom(reward, msg.sender, address(this), amount);
+        require(msg.sender == owner);
+
+        uint _maxLiquidity = UniV3(pool).liquidity();
+        uint _unused = (rewardRate * (DURATION-(Math.max(periodFinish, block.timestamp) - block.timestamp))) * (_maxLiquidity-totalLiquidity) / _maxLiquidity;
+        if (_unused > 0) { _safeTransfer(reward, owner, Math.min(_unused, erc20(reward).balanceOf(address(this)))); }
+
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {
             uint _remaining = periodFinish - block.timestamp;
             uint _leftover = _remaining * rewardRate;
+
             rewardRate = (amount + _leftover) / DURATION;
         }
 
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp + DURATION;
 
+        _safeTransferFrom(reward, msg.sender, address(this), amount);
         emit RewardAdded(msg.sender, amount);
     }
 

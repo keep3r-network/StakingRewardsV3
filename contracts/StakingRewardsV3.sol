@@ -152,7 +152,6 @@ contract StakingRewardsV3 {
         require(_liquidity > 0);
 
         liquidityOf[tokenId] = _liquidity;
-
         owners[tokenId] = msg.sender;
         tokenIds[msg.sender].push(tokenId);
 
@@ -181,6 +180,10 @@ contract StakingRewardsV3 {
     }
 
     function withdraw(uint tokenId) public update(tokenId) {
+        _withdraw(tokenId);
+    }
+
+    function _withdraw(uint tokenId) internal {
         require(owners[tokenId] == msg.sender);
         uint _liquidity = liquidityOf[tokenId];
         liquidityOf[tokenId] = 0;
@@ -227,6 +230,10 @@ contract StakingRewardsV3 {
     function exit(uint tokenId) public {
         withdraw(tokenId);
         getReward(tokenId);
+    }
+
+    function emergencyWithdraw(uint tokenId) external update(0) {
+        _withdraw(tokenId);
     }
 
     function notify(uint amount) external update(0) {

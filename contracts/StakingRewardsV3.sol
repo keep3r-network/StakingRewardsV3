@@ -43,6 +43,13 @@ interface erc20 {
 }
 
 interface PositionManagerV3 {
+    struct CollectParams {
+        uint256 tokenId;
+        address recipient;
+        uint128 amount0Max;
+        uint128 amount1Max;
+    }
+
     function positions(uint256 tokenId)
         external
         view
@@ -64,6 +71,10 @@ interface PositionManagerV3 {
 
     function ownerOf(uint tokenId) external view returns (address);
     function transferFrom(address from, address to, uint tokenId) external;
+     function collect(CollectParams calldata params)
+        external
+        payable
+        returns (uint256 amount0, uint256 amount1);
 }
 
 interface UniV3 {
@@ -107,12 +118,12 @@ contract StakingRewardsV3 {
     mapping(address => uint[]) public tokenIds;
     mapping(uint => uint) public liquidityOf;
     uint public totalLiquidity;
-    uint public unused;
 
     event RewardPaid(address indexed sender, uint tokenId, uint reward);
     event RewardAdded(address indexed sender, uint reward);
     event Deposit(address indexed sender, uint tokenId, uint liquidity);
     event Withdraw(address indexed sender, uint tokenId, uint liquidity);
+    event Collect(address indexed sender, uint tokenId, uint amount0, uint amount1);
 
     constructor(address _reward, address _pool) {
         reward = _reward;
@@ -132,6 +143,16 @@ contract StakingRewardsV3 {
         return rewardPerSecondStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate);
     }
 
+    function collect(uint tokenId) external {
+        _collect(tokenId);
+    }
+
+    function _collect(uint tokenId) internal {
+        PositionManagerV3.CollectParams memory _claim = PositionManagerV3.CollectParams(tokenId, owner, type(uint128).max, type(uint128).max);
+        (uint amount0, uint amount1) = nftManager.collect(_claim);
+        emit Collect(msg.sender, tokenId, amount0, amount1);
+    }
+
     function earned(uint tokenId) public view returns (uint claimable, uint160 secondsPerLiquidityInside) {
         uint _reward = rewardPerSecond() - tokenRewardPerSecondPaid[tokenId];
 
@@ -143,7 +164,7 @@ contract StakingRewardsV3 {
         if (secondsInside > _maxSecondsInside && _secondsInside > 0) {
             _secondsInside = _secondsInside * _maxSecondsInside / secondsInside;
         }
-        claimable = (_reward * _secondsInside) + rewards[tokenId];
+        claimable = (_reward * _secondsInside * UniV3(pool).liquidity() / totalLiquidity) + rewards[tokenId];
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -192,6 +213,7 @@ contract StakingRewardsV3 {
 
     function _withdraw(uint tokenId) internal {
         require(owners[tokenId] == msg.sender);
+        _collect(tokenId);
         uint _liquidity = liquidityOf[tokenId];
         liquidityOf[tokenId] = 0;
         totalLiquidity -= _liquidity;
@@ -210,6 +232,7 @@ contract StakingRewardsV3 {
     }
 
     function getReward(uint tokenId) public update(tokenId) {
+        _collect(tokenId);
         uint _reward = rewards[tokenId];
         if (_reward > 0) {
             rewards[tokenId] = 0;
@@ -251,16 +274,6 @@ contract StakingRewardsV3 {
         _withdraw(tokenId);
     }
 
-    function _unused() internal  {
-        uint _maxLiquidity = UniV3(pool).liquidity();
-        unused += (rewardRate * (DURATION-(Math.max(periodFinish, block.timestamp) - block.timestamp))) * (_maxLiquidity-totalLiquidity) / _maxLiquidity;
-    }
-
-    function refund() external {
-        _unused();
-        if (unused > 0) { _safeTransfer(reward, owner, Math.min(unused, erc20(reward).balanceOf(address(this)))); }
-    }
-
     function notify(uint amount) external update(0) {
         require(msg.sender == owner);
         if (block.timestamp >= periodFinish) {
@@ -280,7 +293,6 @@ contract StakingRewardsV3 {
     }
 
     modifier update(uint tokenId) {
-        _unused();
         uint _rewardPerSecondStored = rewardPerSecond();
         uint _lastUpdateTime = lastTimeRewardApplicable();
         rewardPerSecondStored = _rewardPerSecondStored;

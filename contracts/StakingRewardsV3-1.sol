@@ -157,11 +157,13 @@ contract StakingRewardsV3 {
     }
 
     function _collect(uint tokenId) internal {
-        PositionManagerV3.CollectParams memory _claim = PositionManagerV3.CollectParams(tokenId, owner, type(uint128).max, type(uint128).max);
-        (uint amount0, uint amount1) = nftManager.collect(_claim);
-        earned0 += amount0;
-        earned1 += amount1;
-        emit Collect(msg.sender, tokenId, amount0, amount1);
+        if (owners[tokenId] != address(0)) {
+            PositionManagerV3.CollectParams memory _claim = PositionManagerV3.CollectParams(tokenId, owner, type(uint128).max, type(uint128).max);
+            (uint amount0, uint amount1) = nftManager.collect(_claim);
+            earned0 += amount0;
+            earned1 += amount1;
+            emit Collect(msg.sender, tokenId, amount0, amount1);
+        }
     }
 
     function earned(uint tokenId) public view returns (uint claimable, uint32 secondsInside, uint128 liquidity, uint forfeited) {
@@ -175,7 +177,7 @@ contract StakingRewardsV3 {
         if (_liquidity > 0) {
             time memory _elapsed = elapsed[tokenId];
 
-            uint _maxSecondsElapsed = lastUpdateTime - Math.min(_elapsed.timestamp, periodFinish);
+            uint _maxSecondsElapsed = lastTimeRewardApplicable() - Math.min(_elapsed.timestamp, periodFinish);
             uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
 
             uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
@@ -189,7 +191,6 @@ contract StakingRewardsV3 {
                 liquidity = 0;
             }
         }
-
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -276,24 +277,11 @@ contract StakingRewardsV3 {
         }
     }
 
-    function exit() external {
-        uint[] memory _tokens = tokenIds[msg.sender];
-        for (uint i = 0; i < _tokens.length; i++) {
-            getReward(_tokens[i]);
-            withdraw(_tokens[i]);
-        }
-    }
-
     function withdraw() external {
         uint[] memory _tokens = tokenIds[msg.sender];
         for (uint i = 0; i < _tokens.length; i++) {
             withdraw(_tokens[i]);
         }
-    }
-
-    function exit(uint tokenId) public {
-        getReward(tokenId);
-        withdraw(tokenId);
     }
 
     function notify(uint amount) external update(0) {

@@ -167,7 +167,6 @@ contract StakingRewardsV3 {
         if (totalLiquidity > 0 && _secondsInside > 0) {
             claimable += (_reward * _secondsInside * UniV3(pool).liquidity() / totalLiquidity);
         }
-
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -211,12 +210,12 @@ contract StakingRewardsV3 {
     }
 
     function withdraw(uint tokenId) public update(tokenId) {
+        _collect(tokenId);
         _withdraw(tokenId);
     }
 
     function _withdraw(uint tokenId) internal {
         require(owners[tokenId] == msg.sender);
-        _collect(tokenId);
         uint _liquidity = liquidityOf[tokenId];
         liquidityOf[tokenId] = 0;
         totalLiquidity -= _liquidity;
@@ -273,7 +272,8 @@ contract StakingRewardsV3 {
         getReward(tokenId);
     }
 
-    function emergencyWithdraw(uint tokenId) external update(0) {
+    function emergencyWithdraw(uint tokenId) external {
+        rewards[tokenId] = 0;
         _withdraw(tokenId);
     }
 

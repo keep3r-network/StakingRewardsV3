@@ -166,22 +166,24 @@ contract StakingRewardsV3 {
         (,int24 _tick,,,,,) = UniV3(pool).slot0();
 
         claimable = rewards[tokenId];
-        time memory _elapsed = elapsed[tokenId];
+        uint _liquidity = liquidityOf[tokenId];
+        if (_liquidity > 0) {
+            time memory _elapsed = elapsed[tokenId];
 
-        uint _maxSecondsElapsed = lastUpdateTime - Math.min(_elapsed.timestamp, periodFinish);
-        uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
+            uint _maxSecondsElapsed = lastUpdateTime - Math.min(_elapsed.timestamp, periodFinish);
+            uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
 
-        uint _reward = (liquidityOf[tokenId] * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
-        uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
-        forfeited = _reward - _earned;
-        claimable += _earned;
+            uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
+            uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
+            forfeited = _reward - _earned;
+            claimable += _earned;
 
-        if (_tickLower > _tick || _tick > _tickUpper) {
-            forfeited = claimable;
-            claimable = 0;
-            liquidity = 0;
+            if (_tickLower > _tick || _tick > _tickUpper) {
+                forfeited = claimable;
+                claimable = 0;
+                liquidity = 0;
+            }
         }
-
 
     }
 
@@ -199,8 +201,6 @@ contract StakingRewardsV3 {
         (,int24 _tick,,,,,) = UniV3(_pool).slot0();
         require(tickLower < _tick && _tick < tickUpper);
 
-        liquidityOf[tokenId] = _liquidity;
-        totalLiquidity += _liquidity;
         owners[tokenId] = msg.sender;
         tokenIds[msg.sender].push(tokenId);
 
@@ -291,11 +291,6 @@ contract StakingRewardsV3 {
         withdraw(tokenId);
     }
 
-    function emergencyWithdraw(uint tokenId) external {
-        rewards[tokenId] = 0;
-        _withdraw(tokenId);
-    }
-
     function notify(uint amount) external update(0) {
         require(msg.sender == owner);
         if (block.timestamp >= periodFinish) {
@@ -336,6 +331,7 @@ contract StakingRewardsV3 {
             if (elapsed[tokenId].timestamp < _lastUpdateTime) {
                 elapsed[tokenId] = time(uint32(_lastUpdateTime), _secondsInside);
             }
+
             uint _currentLiquidityOf = liquidityOf[tokenId];
             if (_currentLiquidityOf != _liquidity) {
                 totalLiquidity -= _currentLiquidityOf;

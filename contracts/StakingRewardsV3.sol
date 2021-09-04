@@ -155,7 +155,7 @@ contract StakingRewardsV3 {
 
     function earned(uint tokenId) public view returns (uint claimable, uint160 secondsPerLiquidityInside) {
         uint _reward = rewardPerSecond() - tokenRewardPerSecondPaid[tokenId];
-
+        claimable = rewards[tokenId];
         time memory _elapsed = elapsed[tokenId];
         uint secondsInside;
         (secondsPerLiquidityInside, secondsInside) = _getSecondsInside(tokenId);
@@ -164,7 +164,10 @@ contract StakingRewardsV3 {
         if (secondsInside > _maxSecondsInside && _secondsInside > 0) {
             _secondsInside = _secondsInside * _maxSecondsInside / secondsInside;
         }
-        claimable = (_reward * _secondsInside * UniV3(pool).liquidity() / totalLiquidity) + rewards[tokenId];
+        if (totalLiquidity > 0 && _secondsInside > 0) {
+            claimable += (_reward * _secondsInside * UniV3(pool).liquidity() / totalLiquidity);
+        }
+
     }
 
     function getRewardForDuration() external view returns (uint) {

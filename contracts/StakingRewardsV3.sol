@@ -255,8 +255,8 @@ contract StakingRewardsV3 {
     function exit() external {
         uint[] memory _tokens = tokenIds[msg.sender];
         for (uint i = 0; i < _tokens.length; i++) {
-            withdraw(_tokens[i]);
             getReward(_tokens[i]);
+            withdraw(_tokens[i]);
         }
     }
 
@@ -268,8 +268,8 @@ contract StakingRewardsV3 {
     }
 
     function exit(uint tokenId) public {
-        withdraw(tokenId);
         getReward(tokenId);
+        withdraw(tokenId);
     }
 
     function emergencyWithdraw(uint tokenId) external {

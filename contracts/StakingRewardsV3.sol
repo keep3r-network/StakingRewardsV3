@@ -110,6 +110,7 @@ contract StakingRewardsV3 {
 
     struct time {
         uint32 timestamp;
+        uint32 secondsInside;
         uint160 secondsPerLiquidityInside;
     }
 
@@ -153,16 +154,20 @@ contract StakingRewardsV3 {
         emit Collect(msg.sender, tokenId, amount0, amount1);
     }
 
-    function earned(uint tokenId) public view returns (uint claimable, uint160 secondsPerLiquidityInside) {
+    function getSecondsInside(uint tokenId) external view returns (uint160 secondsPerLiquidityInside, uint32 secondsInside) {
+        return _getSecondsInside(tokenId);
+    }
+
+    function earned(uint tokenId) public view returns (uint claimable, uint32 secondsInside, uint160 secondsPerLiquidityInside) {
         uint _reward = rewardPerSecond() - tokenRewardPerSecondPaid[tokenId];
         claimable = rewards[tokenId];
         time memory _elapsed = elapsed[tokenId];
-        uint secondsInside;
         (secondsPerLiquidityInside, secondsInside) = _getSecondsInside(tokenId);
         uint _maxSecondsInside = lastUpdateTime - Math.min(_elapsed.timestamp, periodFinish);
         uint _secondsInside = Math.min((secondsPerLiquidityInside - _elapsed.secondsPerLiquidityInside) * liquidityOf[tokenId], _maxSecondsInside);
-        if (secondsInside > _maxSecondsInside && _secondsInside > 0) {
-            _secondsInside = _secondsInside * _maxSecondsInside / secondsInside;
+        uint _fullSecondsInside = secondsInside - _elapsed.secondsInside;
+        if (_fullSecondsInside > _maxSecondsInside && _secondsInside > 0) {
+            _secondsInside = _secondsInside * _maxSecondsInside / _fullSecondsInside;
         }
         if (totalLiquidity > 0 && _secondsInside > 0) {
             claimable += (_reward * _secondsInside * UniV3(pool).liquidity() / totalLiquidity);
@@ -301,18 +306,18 @@ contract StakingRewardsV3 {
         rewardPerSecondStored = _rewardPerSecondStored;
         lastUpdateTime = _lastUpdateTime;
         if (tokenId != 0) {
-            (uint _reward, uint160 _secondsPerLiquidityInside) = earned(tokenId);
+            (uint _reward, uint32 _secondsInside, uint160 _secondsPerLiquidityInside) = earned(tokenId);
             tokenRewardPerSecondPaid[tokenId] = _rewardPerSecondStored;
             rewards[tokenId] = _reward;
 
             if (elapsed[tokenId].timestamp < _lastUpdateTime) {
-                elapsed[tokenId] = time(uint32(_lastUpdateTime), _secondsPerLiquidityInside);
+                elapsed[tokenId] = time(uint32(_lastUpdateTime), _secondsInside, _secondsPerLiquidityInside);
             }
         }
         _;
     }
 
-    function _getSecondsInside(uint256 tokenId) internal view returns (uint160 secondsPerLiquidityInside, uint secondsInside) {
+    function _getSecondsInside(uint256 tokenId) internal view returns (uint160 secondsPerLiquidityInside, uint32 secondsInside) {
         (,,,,,int24 tickLower,int24 tickUpper,,,,,) = nftManager.positions(tokenId);
         (,secondsPerLiquidityInside,secondsInside) = UniV3(pool).snapshotCumulativesInside(tickLower, tickUpper);
     }

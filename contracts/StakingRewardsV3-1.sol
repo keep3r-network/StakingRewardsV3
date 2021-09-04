@@ -122,6 +122,9 @@ contract StakingRewardsV3 {
     mapping(uint => uint) public liquidityOf;
     uint public totalLiquidity;
 
+    uint public earned0;
+    uint public earned1;
+
     event RewardPaid(address indexed sender, uint tokenId, uint reward);
     event RewardAdded(address indexed sender, uint reward);
     event Deposit(address indexed sender, uint tokenId, uint liquidity);
@@ -156,6 +159,8 @@ contract StakingRewardsV3 {
     function _collect(uint tokenId) internal {
         PositionManagerV3.CollectParams memory _claim = PositionManagerV3.CollectParams(tokenId, owner, type(uint128).max, type(uint128).max);
         (uint amount0, uint amount1) = nftManager.collect(_claim);
+        earned0 += amount0;
+        earned1 += amount1;
         emit Collect(msg.sender, tokenId, amount0, amount1);
     }
 

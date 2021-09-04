@@ -178,12 +178,15 @@ contract StakingRewardsV3 {
             time memory _elapsed = elapsed[tokenId];
 
             uint _maxSecondsElapsed = lastTimeRewardApplicable() - Math.min(_elapsed.timestamp, periodFinish);
-            uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
+            if (_maxSecondsElapsed > 0) {
+                uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
 
-            uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
-            uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
-            forfeited = _reward - _earned;
-            claimable += _earned;
+                uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
+                uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
+                forfeited = _reward - _earned;
+                claimable += _earned;
+            }
+
 
             if (_tickLower > _tick || _tick > _tickUpper) {
                 forfeited = claimable;

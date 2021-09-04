@@ -104,7 +104,7 @@ contract StakingRewardsV3 {
     uint periodFinish;
     uint lastUpdateTime;
     uint rewardPerLiquidityStored;
-    uint forfeit;
+    uint public forfeit;
 
     mapping(uint => uint) public tokenRewardPerLiquidityPaid;
     mapping(uint => uint) public rewards;

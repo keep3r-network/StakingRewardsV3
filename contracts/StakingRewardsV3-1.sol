@@ -172,7 +172,7 @@ contract StakingRewardsV3 {
         (,,secondsInside) = UniV3(pool).snapshotCumulativesInside(_tickLower, _tickUpper);
         (,int24 _tick,,,,,) = UniV3(pool).slot0();
 
-        claimable = rewards[tokenId];
+
         uint _liquidity = liquidityOf[tokenId];
         if (_liquidity > 0) {
             time memory _elapsed = elapsed[tokenId];
@@ -184,9 +184,8 @@ contract StakingRewardsV3 {
                 uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
                 uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
                 forfeited = _reward - _earned;
-                claimable += _earned;
+                claimable = _earned;
             }
-
 
             if (_tickLower > _tick || _tick > _tickUpper) {
                 forfeited = claimable;
@@ -194,6 +193,7 @@ contract StakingRewardsV3 {
                 liquidity = 0;
             }
         }
+        claimable += rewards[tokenId];
     }
 
     function getRewardForDuration() external view returns (uint) {

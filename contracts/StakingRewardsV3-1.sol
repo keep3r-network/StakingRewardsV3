@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at Etherscan.io on 2021-09-13
+*/
+
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.6;
 
@@ -287,7 +291,12 @@ contract StakingRewardsV3 {
         }
     }
 
-    function notify(uint amount) external update(0) {
+    function deposit_reward_token(address token, uint _reward) external {
+        require(token == reward);
+        notify(_reward);
+    }
+
+    function notify(uint amount) public update(0) {
         require(msg.sender == owner);
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;

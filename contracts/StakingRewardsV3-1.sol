@@ -3,7 +3,7 @@
 */
 
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.6;
+pragma solidity 0.8.9;
 
 library Math {
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -204,7 +204,8 @@ contract StakingRewardsV3 {
         return rewardRate * DURATION;
     }
 
-    function deposit(uint tokenId) external update(tokenId) {
+    function deposit(uint tokenId) external {
+        _update(tokenId);
         (,,address token0,address token1,uint24 fee,int24 tickLower,int24 tickUpper,uint128 _liquidity,,,,) = nftManager.positions(tokenId);
         address _pool = PoolAddress.computeAddress(factory,PoolAddress.PoolKey({token0: token0, token1: token1, fee: fee}));
 
@@ -241,7 +242,8 @@ contract StakingRewardsV3 {
         array.pop();
     }
 
-    function withdraw(uint tokenId) public update(tokenId) {
+    function withdraw(uint tokenId) public {
+        _update(tokenId);
         _collect(tokenId);
         _withdraw(tokenId);
     }
@@ -265,7 +267,10 @@ contract StakingRewardsV3 {
         }
     }
 
-    function getReward(uint tokenId) public update(tokenId) {
+    function getReward(uint tokenId) public {
+        if (liquidityOf[tokenId] > 0) {
+            _update(tokenId);
+        }
         _collect(tokenId);
         uint _reward = rewards[tokenId];
         if (_reward > 0) {
@@ -296,8 +301,9 @@ contract StakingRewardsV3 {
         notify(_reward);
     }
 
-    function notify(uint amount) public update(0) {
+    function notify(uint amount) public {
         require(msg.sender == owner);
+        _update(0);
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {
@@ -322,7 +328,7 @@ contract StakingRewardsV3 {
         _safeTransfer(reward, owner, _forfeit);
     }
 
-    modifier update(uint tokenId) {
+    function _update(uint tokenId) internal {
         uint _rewardPerLiquidityStored = rewardPerLiquidity();
         uint _lastUpdateTime = lastTimeRewardApplicable();
         rewardPerLiquidityStored = _rewardPerLiquidityStored;
@@ -344,7 +350,6 @@ contract StakingRewardsV3 {
                 totalLiquidity += _liquidity;
             }
         }
-        _;
     }
 
     function _safeTransfer(address token, address to, uint256 value) internal {

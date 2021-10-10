@@ -220,6 +220,7 @@ contract StakingRewardsV3 {
                 claimable = _earned;
             }
         }
+        claimable += rewards[tokenId];
     }
 
     function getRewardForDuration() external view returns (uint) {
@@ -353,7 +354,7 @@ contract StakingRewardsV3 {
         if (tokenId != 0) {
             (uint _reward, uint32 _secondsInside, uint _forfeited) = earned(tokenId);
             tokenRewardPerLiquidityPaid[tokenId] = _rewardPerLiquidityStored;
-            rewards[tokenId] += _reward;
+            rewards[tokenId] = _reward;
             forfeit += _forfeited;
 
             if (elapsed[tokenId].timestamp < _lastUpdateTime) {

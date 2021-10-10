@@ -172,6 +172,10 @@ contract StakingRewardsV3 {
         treasury = nextTreasury;
     }
 
+    function getTokenIdsLength(address _owner) external view returns (uint) {
+        return tokenIds[_owner].length;
+    }
+
     function getTokenIds(address _owner) external view returns (uint[] memory) {
         return tokenIds[_owner];
     }

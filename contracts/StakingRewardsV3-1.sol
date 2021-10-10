@@ -202,10 +202,10 @@ contract StakingRewardsV3 {
         (,int24 _tick,,,,,) = UniV3(_pool).slot0();
         require(tickLower < _tick && _tick < tickUpper);
 
+        nftManager.transferFrom(msg.sender, address(this), tokenId);
+        
         owners[tokenId] = msg.sender;
         tokenIds[msg.sender].push(tokenId);
-
-        nftManager.transferFrom(msg.sender, address(this), tokenId);
         
         liquidityOf[tokenId] = _liquidity;
         totalLiquidity += _liquidity;

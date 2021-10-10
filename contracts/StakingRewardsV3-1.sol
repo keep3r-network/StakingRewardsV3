@@ -166,9 +166,9 @@ contract StakingRewardsV3 {
         }
     }
 
-    function earned(uint tokenId) public view returns (uint claimable, uint32 secondsInside, uint128 liquidity, uint forfeited) {
+    function earned(uint tokenId) public view returns (uint claimable, uint32 secondsInside, uint forfeited) {
         (int24 _tickLower, int24 _tickUpper) = (0,0);
-        (,,,,,_tickLower,_tickUpper,liquidity,,,,) = nftManager.positions(tokenId);
+        (,,,,,_tickLower,_tickUpper,,,,,) = nftManager.positions(tokenId);
         (,,secondsInside) = UniV3(pool).snapshotCumulativesInside(_tickLower, _tickUpper);
         (,int24 _tick,,,,,) = UniV3(pool).slot0();
 
@@ -190,7 +190,6 @@ contract StakingRewardsV3 {
             if (_tickLower > _tick || _tick > _tickUpper) {
                 forfeited = claimable;
                 claimable = 0;
-                liquidity = 0;
             }
         }
         claimable += rewards[tokenId];
@@ -200,8 +199,7 @@ contract StakingRewardsV3 {
         return rewardRate * DURATION;
     }
 
-    function deposit(uint tokenId) external {
-        _update(tokenId);
+    function deposit(uint tokenId) external update(tokenId) {
         (,,address token0,address token1,uint24 fee,int24 tickLower,int24 tickUpper,uint128 _liquidity,,,,) = nftManager.positions(tokenId);
         address _pool = PoolAddress.computeAddress(factory,PoolAddress.PoolKey({token0: token0, token1: token1, fee: fee}));
 
@@ -215,6 +213,9 @@ contract StakingRewardsV3 {
         tokenIds[msg.sender].push(tokenId);
 
         nftManager.transferFrom(msg.sender, address(this), tokenId);
+        
+        liquidityOf[tokenId] = _liquidity;
+        totalLiquidity += _liquidity;
 
         emit Deposit(msg.sender, tokenId, _liquidity);
     }
@@ -238,8 +239,7 @@ contract StakingRewardsV3 {
         array.pop();
     }
 
-    function withdraw(uint tokenId) public {
-        _update(tokenId);
+    function withdraw(uint tokenId) public update(tokenId) {
         _collect(tokenId);
         _withdraw(tokenId);
     }
@@ -263,10 +263,7 @@ contract StakingRewardsV3 {
         }
     }
 
-    function getReward(uint tokenId) public {
-        if (liquidityOf[tokenId] > 0) {
-            _update(tokenId);
-        }
+    function getReward(uint tokenId) public update(tokenId) {
         _collect(tokenId);
         uint _reward = rewards[tokenId];
         if (_reward > 0) {
@@ -297,9 +294,8 @@ contract StakingRewardsV3 {
         notify(_reward);
     }
 
-    function notify(uint amount) public {
+    function notify(uint amount) public update(0) {
         require(msg.sender == owner);
-        _update(0);
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {
@@ -324,13 +320,13 @@ contract StakingRewardsV3 {
         _safeTransfer(reward, owner, _forfeit);
     }
 
-    function _update(uint tokenId) internal {
+    modifier update(uint tokenId) {
         uint _rewardPerLiquidityStored = rewardPerLiquidity();
         uint _lastUpdateTime = lastTimeRewardApplicable();
         rewardPerLiquidityStored = _rewardPerLiquidityStored;
         lastUpdateTime = _lastUpdateTime;
         if (tokenId != 0) {
-            (uint _reward, uint32 _secondsInside, uint _liquidity, uint _forfeited) = earned(tokenId);
+            (uint _reward, uint32 _secondsInside, uint _forfeited) = earned(tokenId);
             tokenRewardPerLiquidityPaid[tokenId] = _rewardPerLiquidityStored;
             rewards[tokenId] = _reward;
             forfeit += _forfeited;
@@ -338,14 +334,8 @@ contract StakingRewardsV3 {
             if (elapsed[tokenId].timestamp < _lastUpdateTime) {
                 elapsed[tokenId] = time(uint32(_lastUpdateTime), _secondsInside);
             }
-
-            uint _currentLiquidityOf = liquidityOf[tokenId];
-            if (_currentLiquidityOf != _liquidity) {
-                totalLiquidity -= _currentLiquidityOf;
-                liquidityOf[tokenId] = _liquidity;
-                totalLiquidity += _liquidity;
-            }
         }
+        _;
     }
 
     function _safeTransfer(address token, address to, uint256 value) internal {

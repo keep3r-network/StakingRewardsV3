@@ -71,10 +71,7 @@ interface PositionManagerV3 {
 
     function ownerOf(uint tokenId) external view returns (address);
     function transferFrom(address from, address to, uint tokenId) external;
-     function collect(CollectParams calldata params)
-        external
-        payable
-        returns (uint256 amount0, uint256 amount1);
+    function collect(CollectParams calldata params) external payable returns (uint amount0, uint amount1);
 }
 
 interface UniV3 {
@@ -86,7 +83,6 @@ interface UniV3 {
             uint160 secondsPerLiquidityInsideX128,
             uint32 secondsInside
         );
-    function liquidity() external view returns (uint128);
     function slot0() external view returns (uint160, int24, uint16, uint16, uint16, uint8, bool);
 }
 

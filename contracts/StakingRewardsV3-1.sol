@@ -109,9 +109,9 @@ contract StakingRewardsV3 {
     mapping(uint => uint) public tokenRewardPerLiquidityPaid;
     mapping(uint => uint) public rewards;
 
-    address public gov;
-    address public nextGov;
-    uint public delayGov;
+    address public governance;
+    address public nextGovernance;
+    uint public delayGovernance;
     
     address public treasury;
     address public nextTreasury;
@@ -139,35 +139,35 @@ contract StakingRewardsV3 {
     event Withdraw(address indexed sender, uint tokenId, uint liquidity);
     event Collect(address indexed sender, uint tokenId, uint amount0, uint amount1);
 
-    constructor(address _reward, address _pool, address _gov, address _treasury) {
+    constructor(address _reward, address _pool, address _governance, address _treasury) {
         reward = _reward;
         pool = _pool;
-        gov = _gov;
+        governance = _governance;
         treasury = _treasury;
     }
     
     
-    modifier g() {
-        require(msg.sender == gov);
+    modifier onlyGovernance() {
+        require(msg.sender == governance);
         _;
     }
 
-    function setGov(address _gov) external g {
-        nextGov = _gov;
-        delayGov = block.timestamp + DELAY;
+    function setGovernance(address _governance) external onlyGovernance {
+        nextGovernance = _governance;
+        delayGovernance = block.timestamp + DELAY;
     }
 
-    function acceptGov() external {
-        require(msg.sender == nextGov && delayGov < block.timestamp);
-        gov = nextGov;
+    function acceptGovernance() external {
+        require(msg.sender == nextGovernance && delayGovernance < block.timestamp);
+        governance = nextGovernance;
     }
 
-    function setTreasury(address _treasury) external g {
+    function setTreasury(address _treasury) external onlyGovernance {
         nextTreasury = _treasury;
         delayTreasury = block.timestamp + DELAY;
     }
 
-    function commitTreasury() external g {
+    function commitTreasury() external onlyGovernance {
         require(delayTreasury < block.timestamp);
         treasury = nextTreasury;
     }
@@ -319,7 +319,7 @@ contract StakingRewardsV3 {
         notify(_reward);
     }
 
-    function notify(uint amount) public g update(0) {
+    function notify(uint amount) public onlyGovernance update(0) {
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {
@@ -336,7 +336,7 @@ contract StakingRewardsV3 {
         emit RewardAdded(msg.sender, amount);
     }
 
-    function refund() external g {
+    function refund() external onlyGovernance {
         uint _forfeit = forfeit;
         forfeit = 0;
 

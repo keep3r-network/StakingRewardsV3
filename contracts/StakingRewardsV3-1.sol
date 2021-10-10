@@ -202,8 +202,7 @@ contract StakingRewardsV3 {
     }
 
     function earned(uint tokenId) public view returns (uint claimable, uint32 secondsInside, uint forfeited) {
-        (int24 _tickLower, int24 _tickUpper) = (0,0);
-        (,,,,,_tickLower,_tickUpper,,,,,) = nftManager.positions(tokenId);
+        (,,,,,int24 _tickLower,int24 _tickUpper,,,,,) = nftManager.positions(tokenId);
         (,,secondsInside) = UniV3(pool).snapshotCumulativesInside(_tickLower, _tickUpper);
 
         uint _liquidity = liquidityOf[tokenId];

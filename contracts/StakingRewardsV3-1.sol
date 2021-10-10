@@ -109,7 +109,15 @@ contract StakingRewardsV3 {
     mapping(uint => uint) public tokenRewardPerLiquidityPaid;
     mapping(uint => uint) public rewards;
 
-    address immutable owner;
+    address public gov;
+    address public nextGov;
+    uint public delayGov;
+    
+    address public treasury;
+    address public nextTreasury;
+    uint public delayTreasury;
+    
+    uint32 constant DELAY = 1 days;
 
     struct time {
         uint32 timestamp;
@@ -131,10 +139,37 @@ contract StakingRewardsV3 {
     event Withdraw(address indexed sender, uint tokenId, uint liquidity);
     event Collect(address indexed sender, uint tokenId, uint amount0, uint amount1);
 
-    constructor(address _reward, address _pool) {
+    constructor(address _reward, address _pool, address _gov, address _treasury) {
         reward = _reward;
         pool = _pool;
-        owner = msg.sender;
+        gov = _gov;
+        treasury = _treasury;
+    }
+    
+    
+    modifier g() {
+        require(msg.sender == gov);
+        _;
+    }
+
+    function setGov(address _gov) external g {
+        nextGov = _gov;
+        delayGov = block.timestamp + DELAY;
+    }
+
+    function acceptGov() external {
+        require(msg.sender == nextGov && delayGov < block.timestamp);
+        gov = nextGov;
+    }
+
+    function setTreasury(address _treasury) external g {
+        nextTreasury = _treasury;
+        delayTreasury = block.timestamp + DELAY;
+    }
+
+    function commitTreasury() external g {
+        require(delayTreasury < block.timestamp);
+        treasury = nextTreasury;
     }
 
     function getTokenIds(address _owner) external view returns (uint[] memory) {
@@ -158,7 +193,7 @@ contract StakingRewardsV3 {
 
     function _collect(uint tokenId) internal {
         if (owners[tokenId] != address(0)) {
-            PositionManagerV3.CollectParams memory _claim = PositionManagerV3.CollectParams(tokenId, owner, type(uint128).max, type(uint128).max);
+            PositionManagerV3.CollectParams memory _claim = PositionManagerV3.CollectParams(tokenId, treasury, type(uint128).max, type(uint128).max);
             (uint amount0, uint amount1) = nftManager.collect(_claim);
             earned0 += amount0;
             earned1 += amount1;
@@ -287,8 +322,7 @@ contract StakingRewardsV3 {
         notify(_reward);
     }
 
-    function notify(uint amount) public update(0) {
-        require(msg.sender == owner);
+    function notify(uint amount) public g update(0) {
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {
@@ -305,12 +339,11 @@ contract StakingRewardsV3 {
         emit RewardAdded(msg.sender, amount);
     }
 
-    function refund() external {
-        require(msg.sender == owner);
+    function refund() external g {
         uint _forfeit = forfeit;
         forfeit = 0;
 
-        _safeTransfer(reward, owner, _forfeit);
+        _safeTransfer(reward, treasury, _forfeit);
     }
 
     modifier update(uint tokenId) {

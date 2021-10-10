@@ -170,8 +170,6 @@ contract StakingRewardsV3 {
         (int24 _tickLower, int24 _tickUpper) = (0,0);
         (,,,,,_tickLower,_tickUpper,,,,,) = nftManager.positions(tokenId);
         (,,secondsInside) = UniV3(pool).snapshotCumulativesInside(_tickLower, _tickUpper);
-        (,int24 _tick,,,,,) = UniV3(pool).slot0();
-
 
         uint _liquidity = liquidityOf[tokenId];
         if (_liquidity > 0) {
@@ -185,11 +183,6 @@ contract StakingRewardsV3 {
                 uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
                 forfeited = _reward - _earned;
                 claimable = _earned;
-            }
-
-            if (_tickLower > _tick || _tick > _tickUpper) {
-                forfeited = claimable;
-                claimable = 0;
             }
         }
         claimable += rewards[tokenId];

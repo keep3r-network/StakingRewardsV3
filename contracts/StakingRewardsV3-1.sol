@@ -206,18 +206,16 @@ contract StakingRewardsV3 {
         (,,secondsInside) = UniV3(pool).snapshotCumulativesInside(_tickLower, _tickUpper);
 
         uint _liquidity = liquidityOf[tokenId];
-        if (_liquidity > 0) {
-            time memory _elapsed = elapsed[tokenId];
+        time memory _elapsed = elapsed[tokenId];
 
-            uint _maxSecondsElapsed = lastTimeRewardApplicable() - Math.min(_elapsed.timestamp, periodFinish);
-            if (_maxSecondsElapsed > 0) {
-                uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
-
-                uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
-                uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
-                forfeited = _reward - _earned;
-                claimable = _earned;
-            }
+        uint _maxSecondsElapsed = lastTimeRewardApplicable() - Math.min(_elapsed.timestamp, periodFinish);
+        if (_maxSecondsElapsed > 0) {
+            uint _secondsInside = Math.min(_maxSecondsElapsed, (secondsInside - _elapsed.secondsInside));
+    
+            uint _reward = (_liquidity * (rewardPerLiquidity() - tokenRewardPerLiquidityPaid[tokenId]) / PRECISION);
+            uint _earned = _reward * _secondsInside / _maxSecondsElapsed;
+            forfeited = _reward - _earned;
+            claimable = _earned;
         }
         claimable += rewards[tokenId];
     }

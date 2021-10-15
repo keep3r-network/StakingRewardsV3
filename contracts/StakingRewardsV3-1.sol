@@ -276,7 +276,7 @@ contract StakingRewardsV3 {
         totalLiquidity -= _liquidity;
         owners[tokenId] = address(0);
         _remove(tokenIds[msg.sender], tokenId);
-        nftManager.safeTransferFrom(address(this), msg.sender, tokenId);
+        nftManager.transferFrom(address(this), msg.sender, tokenId);
 
         emit Withdraw(msg.sender, tokenId, _liquidity);
     }

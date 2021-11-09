@@ -187,8 +187,10 @@ contract StakingRewardsV3 {
         return rewardPerLiquidityStored + ((lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * PRECISION / totalLiquidity);
     }
 
-    function collect(uint tokenId) external {
-        _collect(tokenId);
+    function collect(uint[] memory tokenId) external {
+        for (uint i = 0; i < tokenId.length; i++) {
+            _collect(tokenId[i]);
+        }
     }
 
     function _collect(uint tokenId) internal {

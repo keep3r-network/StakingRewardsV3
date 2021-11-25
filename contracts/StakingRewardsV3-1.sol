@@ -108,6 +108,8 @@ contract StakingRewardsV3 {
     address public governance;
     address public nextGovernance;
     uint public delayGovernance;
+
+    address public rewarder;
     
     address public treasury;
     address public nextTreasury;
@@ -137,17 +139,26 @@ contract StakingRewardsV3 {
     event Governance(address indexed previous, address indexed current, uint timestamp);
     event Treasury(address indexed previous, address indexed current, uint timestamp);
 
-    constructor(address _reward, address _pool, address _governance, address _treasury) {
+    constructor(address _reward, address _pool, address _governance, address _treasury, address _rewarder) {
         reward = _reward;
         pool = _pool;
         governance = _governance;
         treasury = _treasury;
+        rewarder = _rewarder;
     }
-    
     
     modifier onlyGovernance() {
         require(msg.sender == governance);
         _;
+    }
+    
+    modifier onlyRewarder() {
+        require(msg.sender == rewarder);
+        _;
+    }
+
+    function setRewarder(address _rewarder) external onlyGovernance {
+        rewarder = _rewarder;
     }
 
     function setGovernance(address _governance) external onlyGovernance {
@@ -325,7 +336,7 @@ contract StakingRewardsV3 {
         notify(_reward);
     }
 
-    function notify(uint amount) public onlyGovernance update(0) {
+    function notify(uint amount) public onlyRewarder update(0) {
         if (block.timestamp >= periodFinish) {
             rewardRate = amount / DURATION;
         } else {

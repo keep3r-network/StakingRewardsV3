@@ -134,6 +134,8 @@ contract StakingRewardsV3 {
     event Deposit(address indexed sender, uint tokenId, uint liquidity);
     event Withdraw(address indexed sender, uint tokenId, uint liquidity);
     event Collect(address indexed sender, uint tokenId, uint amount0, uint amount1);
+    event Governance(address indexed previous, address indexed current, uint timestamp);
+    event Treasury(address indexed previous, address indexed current, uint timestamp);
 
     constructor(address _reward, address _pool, address _governance, address _treasury) {
         reward = _reward;
@@ -155,6 +157,7 @@ contract StakingRewardsV3 {
 
     function acceptGovernance() external {
         require(msg.sender == nextGovernance && delayGovernance < block.timestamp);
+        emit Governance(governance, nextGovernance, block.timestamp);
         governance = nextGovernance;
     }
 
@@ -165,6 +168,7 @@ contract StakingRewardsV3 {
 
     function commitTreasury() external onlyGovernance {
         require(delayTreasury < block.timestamp);
+        emit Treasury(treasury, nextTreasury, block.timestamp);
         treasury = nextTreasury;
     }
 
@@ -234,7 +238,7 @@ contract StakingRewardsV3 {
         require(_liquidity > 0);
 
         (,int24 _tick,,,,,) = UniV3(_pool).slot0();
-        require(tickLower < _tick && _tick < tickUpper);
+        require(tickLower <= _tick && _tick <= tickUpper);
 
         nftManager.transferFrom(msg.sender, address(this), tokenId);
         
@@ -279,7 +283,7 @@ contract StakingRewardsV3 {
         owners[tokenId] = address(0);
         _remove(tokenIds[msg.sender], tokenId);
         nftManager.transferFrom(address(this), msg.sender, tokenId);
-
+        delete elapsed[tokenId];
         emit Withdraw(msg.sender, tokenId, _liquidity);
     }
 
